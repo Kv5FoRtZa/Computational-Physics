@@ -1,0 +1,117 @@
+clc; clear; close all;
+LM = 0;
+TR = 0;
+m1 = 0.35; m2 = 0.15; m3 = 0.20; m4 = 0.25;
+ka = 10; kb = 5; kc = 7; kd = 9;
+La = 0.5; Lb = 0.5; Lc = 0.5; Ld = 0.5;
+eta10 = 0.2; eta20 = -0.2; eta30 = 0.1;
+v10 = -0.12; v20 = 0.13; v30 = 0.05;
+omega11 = sqrt((ka+kb)/m1);
+omega12 = sqrt(kb/m1);
+omega21 = sqrt(kb/m2);
+omega22 = sqrt((kb+kc)/m2);
+omega32 = sqrt(kc/m3);
+omega33 = sqrt((kc+kd)/m3);
+T11 = 2 * pi / omega11;
+T12 = 2 * pi / omega12;
+T21 = 2 * pi / omega21;
+T22 = 2 * pi / omega22;
+T33 = 2 * pi / omega33;
+Tmax = max([T11,T12,T21,T22,T33]);
+ti = 0;
+tf = 5 * Tmax; 
+N = 100000; 
+t = linspace(ti,tf,N); 
+dt = t(2) - t(1);
+eta1 = zeros(1,N); eta2 = eta1; eta3 = eta1;
+v1 = zeros(1,N); v2 = v1; v3 = v1;
+eta1(1) = eta10; eta2(1) = eta20; eta3(1) = eta30;
+eta1(2) = eta10 + v10 * dt;
+eta2(2) = eta20 + v20 * dt;
+eta3(2) = eta30 + v30 * dt;
+for i = 2:N-1
+    a1 = (-ka*eta1(i) + kb*(eta2(i)-eta1(i)))/m1;
+    a2 = (-kb*(eta2(i)-eta1(i)) + kc*(eta3(i)-eta2(i)))/m2;
+    a3 = (-kc*(eta3(i)-eta2(i)) - kd*eta3(i))/m3;
+    eta1(i+1) = 2*eta1(i) - eta1(i-1) + dt^2 * a1;
+    eta2(i+1) = 2*eta2(i) - eta2(i-1) + dt^2 * a2;
+    eta3(i+1) = 2*eta3(i) - eta3(i-1) + dt^2 * a3;
+    v1(i) = (eta1(i+1) - eta1(i))/dt;
+    v2(i) = (eta2(i+1) - eta2(i))/dt;
+    v3(i) = (eta3(i+1) - eta3(i))/dt;
+end
+
+v1(N) = v1(N - 1); 
+v2(N) = v2(N - 1);
+v3(N) = v3(N - 1);
+T1 = 1/2 * m1 * v1.^2;
+T2 = 1/2 * m2 * v2.^2;
+T3 = 1/2 * m3 * v3.^2;
+T = T1 + T2 + T3;
+Ua = 1/2*ka*eta1.^2; 
+Ub = 1/2*kb*(eta2-eta1).^2; 
+Uc = 1/2*kc*(eta3-eta2).^2;
+Ud = 1/2*kd*eta3.^2;
+U = Ua + Ub + Uc + Ud;
+H = T + U;
+if LM == 1
+    figure(1);
+    eta1min = min([eta1 eta2 eta3]);
+    eta1max = max([eta1 eta2 eta3]);
+    plot(t, eta1, '-r', t, eta2, '-b', t, eta3, '-g');
+    xlabel('t / s'); ylabel('deplasari / m');
+    grid; legend('oscilator 1', 'oscilator 2', 'oscilator 3');
+    title('Legile de miscare ale componentelor');
+    axis([ti tf 1.1*eta1min 1.5*eta1max]);
+end
+xs = 0; 
+x1 = La + eta1; 
+x2 = La + Lb + eta2; 
+x3 = La + Lb + Lc + eta3;
+xd = La + Lb + Lc + Ld;
+ga = sqrt(ka * La);
+gb = sqrt(kb * Lb);
+gc = sqrt(kc * Lc);
+gd = sqrt(kd * Ld);
+ga = ga * La ./ (La + eta1);
+gb = gb * Lb ./ (Lb + eta2 - eta1);
+gc = gc * Lc ./ (Lc + eta3 - eta2);
+gd = gd * Ld ./ (Ld - eta3);
+coef = 80; 
+rg1 = coef * m1^(1/3);
+rg2 = coef * m2^(1/3);
+rg3 = coef * m3^(1/3);
+figure(2);
+tic; simt = 0;
+while simt <= tf
+    hold off;
+    j = abs(t - simt) == min(abs(t - simt));
+    plot([xs x1(j)], [0 0], '-m', 'LineWidth', ga(j)); hold on;
+    plot([x1(j) x2(j)], [0 0], '-g', 'LineWidth', gb(j));
+    plot([x2(j) x3(j)], [0 0], '-c', 'LineWidth', gc(j));
+    plot([x3(j) xd], [0 0], '-y', 'LineWidth', gd(j));
+    plot(x1(j), 0, '.r', 'MarkerSize', rg1);
+    plot(x2(j), 0, '.b', 'MarkerSize', rg2);
+    plot(x3(j), 0, '.g', 'MarkerSize', rg3);
+    plot(La, 0, '+k', La+Lb, 0, '+k', La+Lb+Lc, 0, '+k');
+    xlabel('x / m');
+    axis([xs xd -5 5]);
+    if TR == 1
+        simt = toc;
+        text(0.8 * xd, 4, ['t = ' num2str(round(t(j))) ' s']);
+    else
+        simt = simt + 1e-2;
+        text(0.1 * xd, 4.0, ['t = ' num2str(round(t(j) * 10)) ' ds']);
+        text(0.8 * xd, 4.0, ['T = ' num2str(round(T(j) * 1e3)) ' mJ']);
+        text(0.8 * xd, 3.5, ['U = ' num2str(round(U(j) * 1e3)) ' mJ']);
+        text(0.8 * xd, 3.0, ['H = ' num2str(round(H(j) * 1e3)) ' mJ']);
+        text(x1(j), 1.0, ['T1 = ' num2str(round(T1(j) * 1e3)) ' mJ'], 'Color', 'r');
+        text(x2(j), -1.0, ['T2 = ' num2str(round(T2(j) * 1e3)) ' mJ'], 'Color', 'b');
+        text(x3(j), -1.0, ['T3 = ' num2str(round(T3(j) * 1e3)) ' mJ'], 'Color', 'g');
+        text(0.1 * xd, -2, ['Ua = ' num2str(round(Ua(j) * 1e3)) ' mJ'], 'Color', 'm');
+        text(0.4 * xd, -2, ['Ub = ' num2str(round(Ub(j) * 1e3)) ' mJ'], 'Color', 'g');
+        text(0.75 * xd, -2, ['Uc = ' num2str(round(Uc(j) * 1e3)) ' mJ'], 'Color', 'c');
+        text(0.9 * xd, -2, ['Ud = ' num2str(round(Ud(j) * 1e3)) ' mJ'], 'Color', 'y');
+    end
+    pause(1e-6);
+end
